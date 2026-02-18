@@ -52,9 +52,9 @@ pub fn try_from_value(item: proc_macro::TokenStream) -> proc_macro::TokenStream 
             quote! {
                 #[automatically_derived]
                 impl v8_derive::TryFromValue for #struct_identifier {
-                    fn try_from_value<'a>(
-                        input: &'a v8::Local<'a, v8::Value>,
-                        scope: &'a mut v8::HandleScope<'_, v8::Context>,
+                    fn try_from_value(
+                        input: &v8::Local<'_, v8::Value>,
+                        scope: &mut v8::PinScope<'_, '_>,
                     ) -> v8_derive::errors::Result<Self>
                     where
                         Self: Sized {
@@ -110,7 +110,7 @@ pub fn into_value(item: proc_macro::TokenStream) -> proc_macro::TokenStream {
             quote! {
                 #[automatically_derived]
                 impl v8_derive::IntoValue for #struct_identifier {
-                    fn into_value<'a>(self, scope: &mut v8::HandleScope<'a>) -> v8::Local<'a, v8::Value> {
+                    fn into_value<'s>(self, scope: &mut v8::PinScope<'s, '_>) -> v8::Local<'s, v8::Value> {
                         let object = v8::Object::new(scope);
                         #implementation
                         object.into()

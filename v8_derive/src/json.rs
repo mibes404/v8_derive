@@ -2,13 +2,13 @@ use crate::{
     errors::{Error, Result},
     IntoValue, TryFromValue,
 };
-use v8::{HandleScope, Local, Value};
+use v8::{Local, PinScope, Value};
 
 /// Convert a V8 Object to a JSON Value
 ///
 /// # Errors
 /// In case of conversion errors, or if the value is not supported, an error is returned.
-pub(crate) fn v8_to_json_value(scope: &mut HandleScope, value: Local<Value>) -> Result<serde_json::Value> {
+pub(crate) fn v8_to_json_value(scope: &mut PinScope<'_, '_>, value: Local<Value>) -> Result<serde_json::Value> {
     match () {
         () if value.is_string() => {
             let value = String::try_from_value(&value, scope)?;
@@ -41,7 +41,7 @@ pub(crate) fn v8_to_json_value(scope: &mut HandleScope, value: Local<Value>) -> 
     }
 }
 
-fn v8_object_to_json(scope: &mut HandleScope, value: Local<Value>) -> Result<serde_json::Value> {
+fn v8_object_to_json(scope: &mut PinScope<'_, '_>, value: Local<Value>) -> Result<serde_json::Value> {
     let Some(object) = value.to_object(scope) else {
         return Err(Error::ExpectedObject);
     };
@@ -64,7 +64,7 @@ fn v8_object_to_json(scope: &mut HandleScope, value: Local<Value>) -> Result<ser
     Ok(serde_json::Value::Object(json_object))
 }
 
-fn v8_array_to_json(scope: &mut HandleScope, value: Local<Value>) -> Result<serde_json::Value> {
+fn v8_array_to_json(scope: &mut PinScope<'_, '_>, value: Local<Value>) -> Result<serde_json::Value> {
     let Ok(array) = value.try_cast::<v8::Array>() else {
         return Err(Error::ExpectedArray);
     };
@@ -81,7 +81,7 @@ fn v8_array_to_json(scope: &mut HandleScope, value: Local<Value>) -> Result<serd
 }
 
 // Convert serde_json::Value to a V8 Object
-pub(crate) fn json_to_v8<'s>(scope: &mut HandleScope<'s>, value: serde_json::Value) -> Local<'s, Value> {
+pub(crate) fn json_to_v8<'s>(scope: &mut PinScope<'s, '_>, value: serde_json::Value) -> Local<'s, Value> {
     match value {
         serde_json::Value::Null => v8::null(scope).into(),
         serde_json::Value::Bool(b) => b.into_value(scope),

@@ -4,5 +4,5 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-v8 = "139"
+v8 = "145.0.0"
 v8_derive = { path = "../v8_derive" }

@@ -2,10 +2,10 @@ use crate::{errors, from::TryFromValue};
 use std::{collections::HashMap, hash::BuildHasher};
 use v8::GetPropertyNamesArgs;
 
-pub fn get_field_as<'a, T>(
+pub fn get_field_as<T>(
     field_name: &str,
-    input: &'a v8::Local<'a, v8::Value>,
-    scope: &'a mut v8::HandleScope<'_, v8::Context>,
+    input: &v8::Local<'_, v8::Value>,
+    scope: &mut v8::PinScope<'_, '_>,
     parse_fn: ParseFn<T>,
 ) -> errors::Result<T> {
     if !input.is_object() {
@@ -23,10 +23,10 @@ pub fn get_field_as<'a, T>(
     parse_fn(&js_value, scope)
 }
 
-pub fn get_optional_field_as<'a, T>(
+pub fn get_optional_field_as<T>(
     field_name: &str,
-    input: &'a v8::Local<'a, v8::Value>,
-    scope: &'a mut v8::HandleScope<'_, v8::Context>,
+    input: &v8::Local<'_, v8::Value>,
+    scope: &mut v8::PinScope<'_, '_>,
     parse_fn: ParseFn<T>,
 ) -> errors::Result<Option<T>> {
     if !input.is_object() {
@@ -53,37 +53,25 @@ pub fn get_optional_field_as<'a, T>(
     Ok(Some(inner_value))
 }
 
-pub type ParseFn<T> = fn(&'_ v8::Local<'_, v8::Value>, &'_ mut v8::HandleScope<'_>) -> errors::Result<T>;
+pub type ParseFn<T> = fn(&v8::Local<'_, v8::Value>, &mut v8::PinScope<'_, '_>) -> errors::Result<T>;
 
-pub fn try_as_bool<'a>(
-    input: &'a v8::Local<'a, v8::Value>,
-    scope: &'a mut v8::HandleScope<'_, v8::Context>,
-) -> errors::Result<bool> {
+pub fn try_as_bool(input: &v8::Local<'_, v8::Value>, scope: &mut v8::PinScope<'_, '_>) -> errors::Result<bool> {
     // do not check if boolean, JS will answer something, using
     // the boolean values will do the logic from JS exported to the Rust translation
     Ok(input.boolean_value(scope))
 }
 
-pub fn try_as_string<'a>(
-    input: &'a v8::Local<'a, v8::Value>,
-    scope: &'a mut v8::HandleScope<'_, v8::Context>,
-) -> errors::Result<String> {
+pub fn try_as_string(input: &v8::Local<'_, v8::Value>, scope: &mut v8::PinScope<'_, '_>) -> errors::Result<String> {
     // try to convert the value to String anyway
     Ok(input.to_rust_string_lossy(scope))
 }
 
-pub fn try_as_i32<'a>(
-    input: &'a v8::Local<'a, v8::Value>,
-    scope: &'a mut v8::HandleScope<'_, v8::Context>,
-) -> errors::Result<i32> {
+pub fn try_as_i32(input: &v8::Local<'_, v8::Value>, scope: &mut v8::PinScope<'_, '_>) -> errors::Result<i32> {
     // use the framework to get the internal convertion
     input.int32_value(scope).ok_or(errors::Error::ExpectedI32)
 }
 
-pub fn try_as_u32<'a>(
-    input: &'a v8::Local<'a, v8::Value>,
-    scope: &'a mut v8::HandleScope<'_, v8::Context>,
-) -> errors::Result<u32> {
+pub fn try_as_u32(input: &v8::Local<'_, v8::Value>, scope: &mut v8::PinScope<'_, '_>) -> errors::Result<u32> {
     if input.is_uint32() {
         return input.uint32_value(scope).ok_or(errors::Error::ExpectedU32);
     }
@@ -95,44 +83,29 @@ pub fn try_as_u32<'a>(
         .map_err(|_| errors::Error::OutOfRange)
 }
 
-pub fn try_as_i64<'a>(
-    input: &'a v8::Local<'a, v8::Value>,
-    scope: &'a mut v8::HandleScope<'_, v8::Context>,
-) -> errors::Result<i64> {
+pub fn try_as_i64(input: &v8::Local<'_, v8::Value>, scope: &mut v8::PinScope<'_, '_>) -> errors::Result<i64> {
     // use the framework to get the internal convertion
     let i = input.to_big_int(scope).ok_or(errors::Error::ExpectedI64)?;
     Ok(i.i64_value().0)
 }
 
-pub fn try_as_f64<'a>(
-    input: &'a v8::Local<'a, v8::Value>,
-    scope: &'a mut v8::HandleScope<'_, v8::Context>,
-) -> errors::Result<f64> {
+pub fn try_as_f64(input: &v8::Local<'_, v8::Value>, scope: &mut v8::PinScope<'_, '_>) -> errors::Result<f64> {
     // use the framework to get the internal convertion
     input.number_value(scope).ok_or(errors::Error::ExpectedF64)
 }
 
 #[allow(clippy::cast_possible_truncation)]
-pub fn try_as_f32<'a>(
-    input: &'a v8::Local<'a, v8::Value>,
-    scope: &'a mut v8::HandleScope<'_, v8::Context>,
-) -> errors::Result<f32> {
+pub fn try_as_f32(input: &v8::Local<'_, v8::Value>, scope: &mut v8::PinScope<'_, '_>) -> errors::Result<f32> {
     let i = try_as_f64(input, scope)?;
     Ok(i as f32)
 }
 
-pub fn try_as_i8<'a>(
-    input: &'a v8::Local<'a, v8::Value>,
-    scope: &'a mut v8::HandleScope<'_, v8::Context>,
-) -> errors::Result<i8> {
+pub fn try_as_i8(input: &v8::Local<'_, v8::Value>, scope: &mut v8::PinScope<'_, '_>) -> errors::Result<i8> {
     let i = try_as_i32(input, scope)?;
     i8::try_from(i).map_err(|_| errors::Error::OutOfRange)
 }
 
-pub fn try_as_vec<'a, T>(
-    input: &'a v8::Local<'a, v8::Value>,
-    scope: &'a mut v8::HandleScope<'_, v8::Context>,
-) -> errors::Result<Vec<T>>
+pub fn try_as_vec<T>(input: &v8::Local<'_, v8::Value>, scope: &mut v8::PinScope<'_, '_>) -> errors::Result<Vec<T>>
 where
     T: TryFromValue,
 {
@@ -158,9 +131,9 @@ where
     Ok(result)
 }
 
-pub fn try_as_hashmap<'a, T, S>(
-    input: &'a v8::Local<'a, v8::Value>,
-    scope: &'a mut v8::HandleScope<'_, v8::Context>,
+pub fn try_as_hashmap<T, S>(
+    input: &v8::Local<'_, v8::Value>,
+    scope: &mut v8::PinScope<'_, '_>,
 ) -> errors::Result<HashMap<String, T, S>>
 where
     T: TryFromValue,
@@ -225,11 +198,9 @@ pub(crate) mod setup {
         static START: Once = Once::new();
         START.call_once(|| {
             v8::V8::set_flags_from_string(
-                "--no_freeze_flags_after_init --expose_gc --harmony-import-assertions --harmony-shadow-realm --allow_natives_syntax --turbo_fast_api_calls",
+                "--no_freeze_flags_after_init --expose_gc --allow_natives_syntax --turbo_fast_api_calls",
             );
-            v8::V8::initialize_platform(
-                v8::new_unprotected_default_platform(0, false).make_shared(),
-            );
+            v8::V8::initialize_platform(v8::new_unprotected_default_platform(0, false).make_shared());
             v8::V8::initialize();
         });
     }
@@ -240,7 +211,8 @@ pub(crate) mod setup {
         // - v8 is all ok
         setup_test();
         let isolate = &mut v8::Isolate::new(v8::CreateParams::default());
-        let scope = &mut v8::HandleScope::new(isolate);
+        let scope = std::pin::pin!(v8::HandleScope::new(isolate));
+        let scope = &mut scope.init();
         let context = v8::Context::new(scope, v8::ContextOptions::default());
         let scope = &mut v8::ContextScope::new(scope, context);
 
@@ -271,7 +243,8 @@ pub(crate) mod setup {
         // - v8 is all ok
         setup_test();
         let isolate = &mut v8::Isolate::new(v8::CreateParams::default());
-        let scope = &mut v8::HandleScope::new(isolate);
+        let scope = std::pin::pin!(v8::HandleScope::new(isolate));
+        let scope = &mut scope.init();
         let context = v8::Context::new(scope, v8::ContextOptions::default());
         let scope = &mut v8::ContextScope::new(scope, context);
 
@@ -302,7 +275,8 @@ pub(crate) mod setup {
         // - v8 is all ok
         setup_test();
         let isolate = &mut v8::Isolate::new(v8::CreateParams::default());
-        let scope = &mut v8::HandleScope::new(isolate);
+        let scope = std::pin::pin!(v8::HandleScope::new(isolate));
+        let scope = &mut scope.init();
         let context = v8::Context::new(scope, v8::ContextOptions::default());
         let scope = &mut v8::ContextScope::new(scope, context);
 
@@ -333,7 +307,8 @@ pub(crate) mod setup {
         // - v8 is all ok
         setup_test();
         let isolate = &mut v8::Isolate::new(v8::CreateParams::default());
-        let scope = &mut v8::HandleScope::new(isolate);
+        let scope = std::pin::pin!(v8::HandleScope::new(isolate));
+        let scope = &mut scope.init();
         let context = v8::Context::new(scope, v8::ContextOptions::default());
         let scope = &mut v8::ContextScope::new(scope, context);
 
@@ -364,7 +339,8 @@ pub(crate) mod setup {
         // - v8 is all ok
         setup_test();
         let isolate = &mut v8::Isolate::new(v8::CreateParams::default());
-        let scope = &mut v8::HandleScope::new(isolate);
+        let scope = std::pin::pin!(v8::HandleScope::new(isolate));
+        let scope = &mut scope.init();
         let context = v8::Context::new(scope, v8::ContextOptions::default());
         let scope = &mut v8::ContextScope::new(scope, context);
 
@@ -415,7 +391,8 @@ pub(crate) mod setup {
         // - v8 is all ok
         setup_test();
         let isolate = &mut v8::Isolate::new(v8::CreateParams::default());
-        let scope = &mut v8::HandleScope::new(isolate);
+        let scope = std::pin::pin!(v8::HandleScope::new(isolate));
+        let scope = &mut scope.init();
         let context = v8::Context::new(scope, v8::ContextOptions::default());
         let scope = &mut v8::ContextScope::new(scope, context);
 
@@ -446,7 +423,8 @@ pub(crate) mod setup {
         // - v8 is all ok
         setup_test();
         let isolate = &mut v8::Isolate::new(v8::CreateParams::default());
-        let scope = &mut v8::HandleScope::new(isolate);
+        let scope = std::pin::pin!(v8::HandleScope::new(isolate));
+        let scope = &mut scope.init();
         let context = v8::Context::new(scope, v8::ContextOptions::default());
         let scope = &mut v8::ContextScope::new(scope, context);
 
@@ -497,7 +475,8 @@ pub(crate) mod setup {
         // - v8 is all ok
         setup_test();
         let isolate = &mut v8::Isolate::new(v8::CreateParams::default());
-        let scope = &mut v8::HandleScope::new(isolate);
+        let scope = std::pin::pin!(v8::HandleScope::new(isolate));
+        let scope = &mut scope.init();
         let context = v8::Context::new(scope, v8::ContextOptions::default());
         let scope = &mut v8::ContextScope::new(scope, context);
 
@@ -528,7 +507,8 @@ pub(crate) mod setup {
         // - v8 is all ok
         setup_test();
         let isolate = &mut v8::Isolate::new(v8::CreateParams::default());
-        let scope = &mut v8::HandleScope::new(isolate);
+        let scope = std::pin::pin!(v8::HandleScope::new(isolate));
+        let scope = &mut scope.init();
         let context = v8::Context::new(scope, v8::ContextOptions::default());
         let scope = &mut v8::ContextScope::new(scope, context);
 

@@ -18,9 +18,9 @@ pub trait TryFromValue {
     ///
     /// # Errors
     /// In case of conversion errors, or if the value is not supported, an error is returned.
-    fn try_from_value<'a>(
-        input: &'a v8::Local<'a, v8::Value>,
-        scope: &'a mut v8::HandleScope<'_, v8::Context>,
+    fn try_from_value(
+        input: &v8::Local<'_, v8::Value>,
+        scope: &mut v8::PinScope<'_, '_>,
     ) -> errors::Result<Self>
     where
         Self: Sized;
@@ -30,9 +30,9 @@ impl<T> TryFromValue for Vec<T>
 where
     T: TryFromValue,
 {
-    fn try_from_value<'a>(
-        input: &'a v8::Local<'a, v8::Value>,
-        scope: &'a mut v8::HandleScope<'_, v8::Context>,
+    fn try_from_value(
+        input: &v8::Local<'_, v8::Value>,
+        scope: &mut v8::PinScope<'_, '_>,
     ) -> errors::Result<Self> {
         try_as_vec(input, scope)
     }
@@ -43,9 +43,9 @@ where
     T: TryFromValue,
     S: BuildHasher + Default,
 {
-    fn try_from_value<'a>(
-        input: &'a v8::Local<'a, v8::Value>,
-        scope: &'a mut v8::HandleScope<'_, v8::Context>,
+    fn try_from_value(
+        input: &v8::Local<'_, v8::Value>,
+        scope: &mut v8::PinScope<'_, '_>,
     ) -> errors::Result<Self> {
         try_as_hashmap(input, scope)
     }
@@ -55,9 +55,9 @@ impl<T> TryFromValue for Option<T>
 where
     T: TryFromValue,
 {
-    fn try_from_value<'a>(
-        input: &'a v8::Local<'a, v8::Value>,
-        scope: &'a mut v8::HandleScope<'_, v8::Context>,
+    fn try_from_value(
+        input: &v8::Local<'_, v8::Value>,
+        scope: &mut v8::PinScope<'_, '_>,
     ) -> errors::Result<Self> {
         if input.is_null_or_undefined() {
             return Ok(None);
@@ -70,9 +70,9 @@ where
 
 #[cfg(feature = "json")]
 impl TryFromValue for serde_json::Value {
-    fn try_from_value<'a>(
-        input: &'a v8::Local<'a, v8::Value>,
-        scope: &'a mut v8::HandleScope<'_, v8::Context>,
+    fn try_from_value(
+        input: &v8::Local<'_, v8::Value>,
+        scope: &mut v8::PinScope<'_, '_>,
     ) -> errors::Result<Self> {
         let value = v8_to_json_value(scope, *input)?;
         Ok(value)
@@ -85,7 +85,7 @@ macro_rules! impl_try_from_value {
             impl TryFromValue for $t {
                 fn try_from_value<'a>(
                     input: &'a v8::Local<'a, v8::Value>,
-                    scope: &'a mut v8::HandleScope<'_, v8::Context>,
+                    scope: &mut v8::PinScope<'_, '_>,
                 ) -> errors::Result<Self> {
                     $func(input, scope)
                 }
@@ -140,7 +140,8 @@ mod tests {
     fn should_be_able_to_handle_incomplete_values() {
         setup::setup_test();
         let isolate = &mut v8::Isolate::new(CreateParams::default());
-        let scope = &mut v8::HandleScope::new(isolate);
+        let scope = std::pin::pin!(v8::HandleScope::new(isolate));
+        let scope = &mut scope.init();
         let context = v8::Context::new(scope, ContextOptions::default());
         let scope = &mut v8::ContextScope::new(scope, context);
 
@@ -161,7 +162,8 @@ mod tests {
     fn should_be_able_to_parse_primitives() {
         setup::setup_test();
         let isolate = &mut v8::Isolate::new(CreateParams::default());
-        let scope = &mut v8::HandleScope::new(isolate);
+        let scope = std::pin::pin!(v8::HandleScope::new(isolate));
+        let scope = &mut scope.init();
         let context = v8::Context::new(scope, ContextOptions::default());
         let scope = &mut v8::ContextScope::new(scope, context);
 
@@ -233,7 +235,8 @@ mod tests {
     fn should_be_able_to_parse_a_simple_object() {
         setup::setup_test();
         let isolate = &mut v8::Isolate::new(CreateParams::default());
-        let scope = &mut v8::HandleScope::new(isolate);
+        let scope = std::pin::pin!(v8::HandleScope::new(isolate));
+        let scope = &mut scope.init();
         let context = v8::Context::new(scope, ContextOptions::default());
         let scope = &mut v8::ContextScope::new(scope, context);
         let object = v8::Object::new(scope);
@@ -271,7 +274,8 @@ mod tests {
     fn should_be_able_to_handle_optional_fields() {
         setup::setup_test();
         let isolate = &mut v8::Isolate::new(CreateParams::default());
-        let scope = &mut v8::HandleScope::new(isolate);
+        let scope = std::pin::pin!(v8::HandleScope::new(isolate));
+        let scope = &mut scope.init();
         let context = v8::Context::new(scope, ContextOptions::default());
         let scope = &mut v8::ContextScope::new(scope, context);
 
@@ -306,7 +310,8 @@ mod tests {
     fn should_be_able_to_parse_nested_objects() {
         setup::setup_test();
         let isolate = &mut v8::Isolate::new(CreateParams::default());
-        let scope = &mut v8::HandleScope::new(isolate);
+        let scope = std::pin::pin!(v8::HandleScope::new(isolate));
+        let scope = &mut scope.init();
         let context = v8::Context::new(scope, ContextOptions::default());
         let scope = &mut v8::ContextScope::new(scope, context);
 
@@ -349,7 +354,8 @@ mod tests {
     fn can_deserialize_an_object_with_a_vec() {
         setup::setup_test();
         let isolate = &mut v8::Isolate::new(CreateParams::default());
-        let scope = &mut v8::HandleScope::new(isolate);
+        let scope = std::pin::pin!(v8::HandleScope::new(isolate));
+        let scope = &mut scope.init();
         let context = v8::Context::new(scope, ContextOptions::default());
         let scope = &mut v8::ContextScope::new(scope, context);
 
@@ -376,7 +382,8 @@ mod tests {
     fn should_be_able_to_parse_a_simple_object_to_hashmap() {
         setup::setup_test();
         let isolate = &mut v8::Isolate::new(CreateParams::default());
-        let scope = &mut v8::HandleScope::new(isolate);
+        let scope = std::pin::pin!(v8::HandleScope::new(isolate));
+        let scope = &mut scope.init();
         let context = v8::Context::new(scope, ContextOptions::default());
         let scope = &mut v8::ContextScope::new(scope, context);
         let object = v8::Object::new(scope);
